@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF圧縮アプリ</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .drop-zone {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+            margin-bottom: 20px;
+        }
+
+        .drop-zone:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .drop-zone.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+            transform: scale(1.02);
+        }
+
+        .drop-zone-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .drop-zone-text {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .drop-zone-hint {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-info {
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .file-info.active {
+            display: block;
+        }
+
+        .file-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+
+        .file-size {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .compression-level {
+            margin-bottom: 20px;
+        }
+
+        .compression-level label {
+            display: block;
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .compression-options {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .compression-option {
+            flex: 1;
+            min-width: 150px;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .compression-option:hover {
+            border-color: #667eea;
+        }
+
+        .compression-option.selected {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .compression-option input {
+            display: none;
+        }
+
+        .option-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .option-desc {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+
+        .btn-compress {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-compress:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-compress:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-download {
+            background: #10b981;
+            color: white;
+            display: none;
+        }
+
+        .btn-download.active {
+            display: block;
+        }
+
+        .btn-download:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .progress {
+            width: 100%;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            display: none;
+            height: 40px;
+            position: relative;
+        }
+
+        .progress.active {
+            display: block;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #333;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        .result {
+            background: #f0fdf4;
+            border: 2px solid #10b981;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .result.active {
+            display: block;
+        }
+
+        .result-title {
+            font-weight: bold;
+            color: #059669;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .result-stats {
+            color: #333;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .warning {
+            background: #fffbeb;
+            border: 2px solid #f59e0b;
+            border-radius: 10px;
+            padding: 15px;
+            color: #92400e;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .warning.active {
+            display: block;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 2px solid #ef4444;
+            border-radius: 10px;
+            padding: 15px;
+            color: #dc2626;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .info {
+            background: #f0f9ff;
+            border-radius: 8px;
+            padding: 12px;
+            color: #0c4a6e;
+            font-size: 13px;
+            margin-top: 15px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 PDF圧縮アプリ</h1>
+        <div class="subtitle">ブラウザで完結・安全・簡単</div>
+
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-icon">📁</div>
+            <div class="drop-zone-text">PDFファイルをドラッグ&ドロップ</div>
+            <div class="drop-zone-hint">または、クリックしてファイルを選択</div>
+        </div>
+
+        <input type="file" id="fileInput" class="file-input" accept=".pdf">
+
+        <div class="file-info" id="fileInfo">
+            <div class="file-name" id="fileName"></div>
+            <div class="file-size" id="fileSize"></div>
+        </div>
+
+        <div class="compression-level">
+            <label>圧縮レベルを選択:</label>
+            <div class="compression-options">
+                <label class="compression-option selected">
+                    <input type="radio" name="compression" value="low" checked>
+                    <div class="option-title">低</div>
+                    <div class="option-desc">高品質維持</div>
+                </label>
+                <label class="compression-option">
+                    <input type="radio" name="compression" value="medium">
+                    <div class="option-title">中</div>
+                    <div class="option-desc">推奨</div>
+                </label>
+                <label class="compression-option">
+                    <input type="radio" name="compression" value="high">
+                    <div class="option-title">高</div>
+                    <div class="option-desc">最大圧縮</div>
+                </label>
+            </div>
+        </div>
+
+        <div class="warning" id="warning"></div>
+        <div class="error" id="error"></div>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar" id="progressBar"></div>
+            <div class="progress-text" id="progressText">処理中...</div>
+        </div>
+
+        <button class="btn btn-compress" id="compressBtn" disabled>圧縮する</button>
+
+        <div class="result" id="result">
+            <div class="result-title">✅ 圧縮完了!</div>
+            <div class="result-stats" id="resultStats"></div>
+        </div>
+
+        <button class="btn btn-download" id="downloadBtn">圧縮済みPDFをダウンロード</button>
+
+        <div class="info">
+            💡 このアプリは100%ブラウザ内で動作します。ファイルはサーバーにアップロードされないため安全です。
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const compressBtn = document.getElementById('compressBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const result = document.getElementById('result');
+        const resultStats = document.getElementById('resultStats');
+        const warningDiv = document.getElementById('warning');
+        const errorDiv = document.getElementById('error');
+
+        let selectedFile = null;
+        let compressedPdfBytes = null;
+
+        // 圧縮レベルの選択
+        const compressionOptions = document.querySelectorAll('.compression-option');
+        compressionOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                compressionOptions.forEach(opt => opt.classList.remove('selected'));
+                option.classList.add('selected');
+            });
+        });
+
+        // ドロップゾーンのクリック
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // ファイル選択
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+
+        // ドラッグオーバー
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        // ドラッグリーブ
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        // ドロップ
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        // ファイル処理
+        function handleFile(file) {
+            if (!file) return;
+
+            if (file.type !== 'application/pdf') {
+                showError('PDFファイルを選択してください。');
+                return;
+            }
+
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = `ファイルサイズ: ${formatFileSize(file.size)}`;
+            fileInfo.classList.add('active');
+            compressBtn.disabled = false;
+            result.classList.remove('active');
+            downloadBtn.classList.remove('active');
+            errorDiv.classList.remove('active');
+            warningDiv.classList.remove('active');
+        }
+
+        // ファイルサイズのフォーマット
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        // エラー表示
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.classList.add('active');
+            setTimeout(() => {
+                errorDiv.classList.remove('active');
+            }, 5000);
+        }
+
+        // 警告表示
+        function showWarning(message) {
+            warningDiv.textContent = message;
+            warningDiv.classList.add('active');
+        }
+
+        // プログレス更新
+        function updateProgress(percent, text) {
+            progressBar.style.width = percent + '%';
+            progressText.textContent = text;
+        }
+
+        // 圧縮ボタン
+        compressBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            try {
+                compressBtn.disabled = true;
+                progress.classList.add('active');
+                result.classList.remove('active');
+                downloadBtn.classList.remove('active');
+                errorDiv.classList.remove('active');
+                warningDiv.classList.remove('active');
+
+                updateProgress(10, 'PDFを読み込み中...');
+
+                const compressionLevel = document.querySelector('input[name="compression"]:checked').value;
+                const originalSize = selectedFile.size;
+
+                // 圧縮設定
+                let quality, scale;
+                switch (compressionLevel) {
+                    case 'low':
+                        quality = 0.85;
+                        scale = 1.5;
+                        break;
+                    case 'medium':
+                        quality = 0.70;
+                        scale = 1.2;
+                        break;
+                    case 'high':
+                        quality = 0.50;
+                        scale = 1.0;
+                        break;
+                }
+
+                updateProgress(20, 'PDFを解析中...');
+
+                // PDFを読み込む
+                const arrayBuffer = await selectedFile.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                const pdf = await loadingTask.promise;
+
+                updateProgress(30, `${pdf.numPages}ページを処理中...`);
+
+                // 新しいPDFドキュメントを作成
+                const pdfDoc = await PDFLib.PDFDocument.create();
+
+                // 各ページを処理
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    updateProgress(30 + (pageNum / pdf.numPages) * 50, `ページ ${pageNum}/${pdf.numPages} を圧縮中...`);
+
+                    const page = await pdf.getPage(pageNum);
+                    const viewport = page.getViewport({ scale: scale });
+
+                    // キャンバスを作成
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    // ページをレンダリング
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+
+                    // 画像を圧縮してJPEG化
+                    const imgData = canvas.toDataURL('image/jpeg', quality);
+                    
+                    // 新しいPDFに画像を追加
+                    const img = await pdfDoc.embedJpg(imgData);
+                    const pdfPage = pdfDoc.addPage([viewport.width, viewport.height]);
+                    pdfPage.drawImage(img, {
+                        x: 0,
+                        y: 0,
+                        width: viewport.width,
+                        height: viewport.height,
+                    });
+                }
+
+                updateProgress(85, '最終処理中...');
+
+                // 圧縮されたPDFを保存
+                compressedPdfBytes = await pdfDoc.save();
+
+                updateProgress(100, '完了!');
+
+                const compressedSize = compressedPdfBytes.length;
+                const sizeDiff = originalSize - compressedSize;
+                const reductionPercent = (sizeDiff / originalSize * 100).toFixed(1);
+
+                // 結果を表示
+                if (sizeDiff > 0) {
+                    resultStats.innerHTML = `
+                        <strong>元のサイズ:</strong> ${formatFileSize(originalSize)}<br>
+                        <strong>圧縮後:</strong> ${formatFileSize(compressedSize)}<br>
+                        <strong>削減量:</strong> ${formatFileSize(sizeDiff)} (${reductionPercent}%)
+                    `;
+                    result.classList.add('active');
+                } else {
+                    const increasePercent = Math.abs((sizeDiff / originalSize * 100)).toFixed(1);
+                    showWarning(`このPDFは圧縮できませんでした。テキスト主体のPDFは、画像化することで逆にサイズが増加する場合があります（${increasePercent}%増加）。元のファイルをそのままお使いください。`);
+                }
+
+                progress.classList.remove('active');
+                downloadBtn.classList.add('active');
+                compressBtn.disabled = false;
+
+            } catch (error) {
+                console.error('圧縮エラー:', error);
+                showError('PDFの圧縮中にエラーが発生しました: ' + error.message);
+                progress.classList.remove('active');
+                compressBtn.disabled = false;
+            }
+        });
+
+        // ダウンロードボタン
+        downloadBtn.addEventListener('click', () => {
+            if (!compressedPdfBytes) return;
+
+            const blob = new Blob([compressedPdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = selectedFile.name.replace('.pdf', '_compressed.pdf');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
